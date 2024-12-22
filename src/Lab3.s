@@ -3,11 +3,11 @@
 .file "lab3.s" # имя файла (необязательно)
 .global _start
 .data
-    arr: .quad 1, 2, 3, 4, 5
+    arr: .quad 1, 2, 3, 4, 5		#gdb info variables
     	 .quad 6, 7, 8, 9, 10
     	 .quad 11, 12, 13, 14, 15
     	 .quad 16, 17, 18, 19, 20
-    arr_end:
+    arr_end: .quad 0
     elemSize: .quad 8
     #count: .quad (.-arr)/elemSize		#NxM - кол-во элементов
     rows: .quad 4				# N				
@@ -18,7 +18,11 @@
     j_min: .quad 0					# colIndex
     max: .quad 0
     min: .quad 0
-    tmp: .quad 0
+    tmp: .quad 0, 0, 0, 0, 0		#gdb info variables
+    	 .quad 0, 0, 0, 0, 0
+    	 .quad 0, 0, 0, 0, 0
+    	 .quad 0, 0, 0, 0, 0
+    		
     msg: .ascii "Program search min and max in array NxM and swap cols and rows\n"
    
     s: .string "\n"
@@ -36,7 +40,7 @@ _start:
     movq $msg, %rsi 		# адрес начала строки
     movq $64, %rdx 		# кол-во выводимых символов
     syscall
-    
+ m:
     leaq arr, %rax		# arr[0]
     movq $return1, %rdi
     jmp max_proc
@@ -67,15 +71,16 @@ exit:
     
     
 max_proc:
-    # %rax - max элемент - при инициализации arr[0]
+    # %rax - max элемент - при инициализации arr[0] -
     # %rcx - адрес текущего элемента 
     # %rdx - смещение ($cols*i + j)
     # %rbx - N*i*Larr , i = from 0 to M-1 - i - rows
     # %rsi - j, j = from 0 to N-1 - j - cols
     
     #movq $arr, %rax		# max элемент  в max_proc через %rax
-    movq $elemSize, %rsi
-    movq (%rax, %rsi), %rcx	# адрес текущего элемента (%rax + elemSize)
+   # movq $elemSize, %rsi
+    movq %rax, %rcx	
+    addq $8, %rcx  # адрес текущего элемента (%rax + elemSize)
     
     xorq %rbx, %rbx		# i = 0
     outer_max_loop: 		   			
@@ -86,11 +91,15 @@ max_proc:
         movq %rbx, %rdx	# в %rdx индекс строки - i 
         imulq $cols, %rdx	# cols * i
         addq %rsi, %rdx	# cols * i + j    
+        #imulq $elemSize, %rdx # (cols*i + j)*elemSize 
         # сравним текущий элемент и следующий = base_adr + (cols*i + j)*elemSize + elemSize
-        cmpq (%rcx, %rdx,8), %rax 
+        #addq %rdx, %rcx	# base_adr + (cols*i + j)*elemSize + elemSize
+         # сравним максимальный элемент и следующий 
+        movq (%rcx, %rdx,8), %rcx
+        cmpq *(%rcx), *(%rax) 
         jna next_max
         # если следующий больше, обновим максимум, сохраним индексы
-        movq (%rcx, %rdx, 8), %rax 
+        movq %rcx, %rax 
         movq %rbx, i_max 		# индекс строки максимального элемента
         movq %rsi, j_max		# индекс столбца максимального элемента
     next_max: 
@@ -121,8 +130,9 @@ min_proc:
     # %rsi - j = from 0 to cols-1 (N-1) индекс столбца
     
     #movq arr, %rax		# max элемент  в max_proc через %rax
-    movq $elemSize, %rsi
-    movq (%rax, %rsi), %rcx	# адрес текущего элемента (%rax + elemSize)
+    #movq $elemSize, %rsi
+    movq %rax, %rcx	
+    addq $8, %rcx  # адрес текущего элемента (%rax + elemSize)
     
     xorq %rbx, %rbx		#  i = 0
     outer_min_loop: 		

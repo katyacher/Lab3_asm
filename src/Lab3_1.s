@@ -3,10 +3,10 @@
 .file "lab3.s" # имя файла (необязательно)
 .global _start
 .data
-    arr: .quad 1, 2, 3, 4, 5		#gdb info variables
-    	 .quad 6, 7, 8, 9, 10
-    	 .quad 11, 12, 13, 14, 15
-    	 .quad 16, 17, 18, 19, 20
+    arr: .quad 1, 1, 1, 1, 5		#gdb info variables
+    	 .quad 1, 1, 1, 1, 1
+    	 .quad 1, 1, 1, 1, 1
+    	 .quad 0, 1, 1, 1, 1
     arr_end: .quad 0
     elemSize: .quad 8
     #count: .quad (.-arr)/elemSize		#NxM - кол-во элементов
@@ -20,9 +20,10 @@
     min: .quad 0
     tmp: .quad 0
     adr_tmp: .long 0
-    		
+    	
     msg: .ascii "Program search min and max in array NxM and swap cols and rows\n"
-   
+    msg1: .ascii "Swap rows\n"
+    msg2: .ascii "Swap cols\n"
     s: .string "\n"
     Lc0: .ascii "%s\0"
 		
@@ -36,30 +37,54 @@ _start:
     movq $1, %rax 		# sys_write
     movq $1, %rdi 		# стандартная консоль
     movq $msg, %rsi 		# адрес начала строки
-    movq $64, %rdx 		# кол-во выводимых символов
+    movq $63, %rdx 		# кол-во выводимых символов
     syscall
- 
+ 	
+    movq $10, %rcx
+    movq $max_min, %r9
+    jmp print_arr
+max_min:
     movq $return1, %rdi
     jmp max_proc
 return1:
+   
     movq $return2, %rdi
     jmp min_proc
 return2:
+	
     leaq arr, %rax		# arr[0]
-    movq $return3, %rdi
+    movq $swp_prt, %rdi
     jmp swap_cols
-return3:
-    leaq arr, %rax		# arr[0]
-    movq $return4, %rdi
-    jmp swap_rows
-return4:
-    leaq arr, %rax		# arr[0]
+swp_prt:
+    # выведем строку msg на экран
+    movq $1, %rax 		# sys_write
+    movq $1, %rdi 		# стандартная консоль
+    movq $msg1, %rsi 		# адрес начала строки
+    movq $10, %rdx 		# кол-во выводимых символов
+    syscall
+
     movq $10, %rcx
-    movq $cols, %rbx
-    movq $rows, %rsi
+    movq $return3, %r9
+    jmp print_arr	
+return3:
+
+    leaq arr, %rax		# arr[0]
+    movq $swp_prt2, %rdi
+    jmp swap_rows
+swp_prt2:
+     # выведем строку msg на экран
+    movq $1, %rax 		# sys_write
+    movq $1, %rdi 		# стандартная консоль
+    movq $msg2, %rsi 		# адрес начала строки
+    movq $10, %rdx 		# кол-во выводимых символов
+    syscall
+	
+    movq $10, %rcx
     movq $exit, %r9
     jmp print_arr
+    
 exit:	
+   
     movq %rbp, %rsp
     movq $60, %rax 	# exit
     movq $0, %rdi
@@ -186,7 +211,7 @@ swap_rows:
      	movq %rsi, %rbx	# rbx = i
      	imulq cols, %rbx 	# rbx = rbx * i = i *cols
      	addq j_max, %rbx 	# rbx = rsi + rbx = i*cols + j_max
-     	imulq $8, %rbx 	# rsi = rbx*8 = (i*cols + j_max)*8
+     	imulq $8, %rbx 	# rbx = rbx*8 = (i*cols + j_max)*8
      	addq %rbx, %rax	# rax = rax + rbx = rax + (i*cols + j_max)*8
      	movq (%rax), %rdx	# max
      	
@@ -210,50 +235,49 @@ swap_rows:
 
 	
 print_arr:
-    # %rax - адрес массива
-    # %rcx - система счисления 10
-    # %rbx - число столбцов - j
-    # %rsi - число строк - i 
-    # %r8 - начальное начальное значение счетчика кол-ва символов в итоговой строке
-    movq $10, %rcx
-    xorq %rbx, %rbx
-    xorq %r8, %r8
-    outer: 
-        xorq %rsi, %rsi
-        inner:
-        movq arr, %rax
-        movq $cols, %rdx
-        imul %rsi, %rdx
-        addq %rbx, %rdx
-        movq (%rax, %rdx, 8), %rax
+
+	xorq %r8, %r8		# счетчик символов в итоговой строке
+	xorq %rsi, %rsi	# индекс элемента массива
+       # movq  arr, %rax        # max элемент в начале наибольшее значение — array[0] 
+        movq  $arr_end-8, %rbx      # адрес текущего элемента массива                          
+        jmp   arr_bound         # проверить границы массива 
+        subq $1, %rsp 	 	# выделить  один байт в стеке под символ
+        movb $10, 0(%rsp)	 # "\n" в %rsp
+	addq $1, %r8		# увеличить счетчик символов в итоговой строке
+loop:
+
+        # преобразовать число в строку и запушить в стек                                                    
+        movq (%rbx), %rax
+        movq $10, %rcx
         
         movq $ret1, %rdi
 	jmp to_str_proc
-	ret1:
-        
+	ret1:     
+        	
         subq $1, %rsp 	 	# выделить еще один байт в стеке под символ
-	movb $32, 0(%rsp) 	# загрузить значение 'пробел' в стек
-	addq $1, %r8		# увеличить счетчик символов в итоговой строке
-        
-        incq %rsi
-        cmpq $cols, %rsi
-        je inner_end
-        jmp inner
-        
-        inner_end:
+        movb $32, 0(%rsp)	 # " " в %rsp
+	addq $1, %r8		# увеличить счетчик символов в итоговой строке	
+        	
+        incq %rsi 		# сохранить индекс элемента %rcx + 1
+        movq %rsi, %rax
+        movq cols, %rdi
+        xorq %rdx,%rdx
+        divq %rdi
+        cmpq $0, %rdx           
+	jne n_add       
         subq $1, %rsp 	 	# выделить еще один байт в стеке под символ
-	movb $92, 0(%rsp) 	# загрузить значение '\' в стек
+        movb $10, 0(%rsp)	 # "\n" в %rsp
 	addq $1, %r8		# увеличить счетчик символов в итоговой строке
-	subq $1, %rsp 	 	# выделить еще один байт в стеке под символ
-	movb $110, 0(%rsp) 	# загрузить значение 'n' в стек
-	addq $1, %r8		# увеличить счетчик символов в итоговой строке
-	
-	incq %rbx
-	cmpq $rows, %rbx
-	je outer_end
-	jmp outer
-    outer_end:
-        # выведем результат на экран
+n_add:	
+	subq  $8, %rbx          # увеличить %rbx на размер одного элемента массива, 8 байт 
+            	
+arr_bound:
+        cmpq  $arr, %rbx    # сравнить адрес текущего элемента и  адрес конца массива             
+        jge    loop        # если они не равны, повторить цикл снова 
+
+# выведем результат на экран
+      
+    	addq $1, %rsp
         xorq %rsi, %rsi
         xorq %rdx, %rdx
 	movq $0, %rdx
@@ -262,16 +286,24 @@ print_arr:
 	movq %rsp, %rsi 	# адрес начала строки - в стеке сохранен результат z
 	movq %r8, %rdx 	# кол-во выводимых символов
 	syscall
-        jmp *%r9 		# перейти на адрес возврата, сохраненный в rdi	 
+	
+    movq $1, %rax 		# sys_write
+    movq $1, %rdi 		# стандартная консоль
+    movq $s, %rsi 		# адрес начала строки
+    movq $1, %rdx 		# кол-во выводимых символов
+    syscall
+    jmp *%r9 		# перейти на адрес возврата, сохраненный в rdi	
 
-to_str_proc:
+
+
+to_str_proc: # преобразование числа из rax в строку и загрузка строки в стек 
     # параметры для подпрограммы to_str_proc:
     # %rax - число, которое нужно преобразовать в строку
     # %rcx - основание системы счисления  
     # %rsp - адрес левой границы стека
-    # %rcx - начальное значение счетчика кол-ва символов в итоговой строке - %r8
+    # %r8 -  счетчик кол-ва символов в итоговой строке - %r8
     # %rdi - адрес возврата
-    # преобразование числа из rax в строку и загрузка строки в стек 
+    
  
 	movq %rax, %r15 	# сохраним число для проверки на отрицательность в конце цикла
 	# проверить на отрицательность число
@@ -282,7 +314,7 @@ to_str_proc:
 		addq $1, %rax		# прибавить 1
 to_str_loop: 
 	xorq %rdx, %rdx 	# обнуление регистров
-	div %rbx	 	# произвести целочисленное деление %rax/%rbx - остаток в %rdx (в младшем байте)
+	div %rcx	 	# произвести целочисленное деление %rax/%rbx - остаток в %rdx (в младшем байте)
 	addb $48, %dl	 	# преобразуем цифру в код символа
 	cmpb $58, %dl		# если %dl < 58 
 	jb d			# то прибавлять не нужно
@@ -291,7 +323,7 @@ to_str_loop:
 	subq $1, %rsp 	 	# выделить еще один байт в стеке под символ
 	movb %dl, 0(%rsp) 	# загрузить значение в стек
 	addq $1, %r8		# увеличить счетчик символов в итоговой строке
-	cmpq $0, %rax		# 
+	cmpq $0, %rax		 
 	je to_str_loop_end	# выйти из цикла
 	jmp to_str_loop	# перейти в начало цикла
 to_str_loop_end:
@@ -300,7 +332,7 @@ to_str_loop_end:
 		# если число отрицательное - загрузим и допишем в строку знак "-"
 		subq $1, %rsp		# выделить байт на стеке
 		movb $45, 0(%rsp)	# загрузить символ "-"
-		addq $1, %rcx		# увеличить счетчик символов в итоговой строке
+		addq $1, %r8		# увеличить счетчик символов в итоговой строке
 to_str_proc_end:
 	jmp *%rdi 		# перейти на адрес возврата, сохраненный в rdi
 	
